@@ -72,6 +72,30 @@ npm run build
 npm start
 ```
 
+## Docker
+
+The image is built locally; no registry tag is published.
+
+**Docker Compose:**
+
+```bash
+cp .env.example .env   # fill in PTERODACTYL_URL and at least one API key
+docker compose up -d --build
+```
+
+`docker-compose.yml` reads `.env`, publishes port `3000` and restarts unless stopped. Inside the container `PORT` is pinned to `3000` so the published port and the health check stay in sync — to move the host port use `MCP_HOST_PORT`, e.g. `MCP_HOST_PORT=8080 docker compose up -d`.
+
+**Plain Docker:**
+
+```bash
+docker build -t pterodactyl-mcp .
+docker run -d --name pterodactyl-mcp --env-file .env -p 3000:3000 pterodactyl-mcp
+```
+
+The image runs as the non-root `node` user with `tini` as PID 1 and ships a `HEALTHCHECK` against `/health`, so `docker compose ps` reports `(healthy)` once the server answers.
+
+Endpoints are unchanged: `http://localhost:3000/mcp` and `http://localhost:3000/health`. Set `MCP_AUTH_TOKEN` in `.env` before publishing the port beyond localhost — otherwise `/mcp` is unauthenticated.
+
 ## Transport modes
 
 ### HTTP (default)
