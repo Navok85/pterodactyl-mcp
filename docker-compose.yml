@@ -1,0 +1,12 @@
+services:
+  pterodactyl-mcp:
+    build: .
+    image: pterodactyl-mcp:latest
+    container_name: pterodactyl-mcp
+    env_file: .env
+    environment:
+      # Pinned so the published port and the image's HEALTHCHECK stay in sync.
+      PORT: 3000
+    ports:
+      - "${MCP_HOST_PORT:-3000}:3000"
+    restart: unless-stopped

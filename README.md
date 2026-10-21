@@ -31,6 +31,7 @@ cp .env.example .env
 | `PTERODACTYL_CLIENT_KEY` | Client API key (`ptlc_*`) for client operations (optional) |
 | `PORT` | HTTP server port (default: `3000`) |
 | `MCP_JSON_LIMIT` | Maximum JSON request size for HTTP transport (default: `50mb`; increase for larger uploads) |
+| `MCP_AUTH_TOKEN` | Optional bearer token required on `/mcp` (HTTP transport). Unset = no authentication |
 
 At least one API key is required. You can use both to enable all tools.
 
@@ -84,6 +85,14 @@ npx @duruma/pterodactyl-mcp
 ```
 
 The MCP endpoint is available at `http://localhost:3000/mcp`. A health check is at `/health`.
+
+If `MCP_AUTH_TOKEN` is set, every request to `/mcp` must send it as a bearer token:
+
+```bash
+curl -H "Authorization: Bearer $MCP_AUTH_TOKEN" http://localhost:3000/mcp
+```
+
+MCP clients must send the same header, e.g. `"headers": { "Authorization": "Bearer $MCP_AUTH_TOKEN" }`. `/health` stays unauthenticated, and stdio transport ignores this variable.
 
 ### Stdio
 
