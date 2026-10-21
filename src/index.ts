@@ -1,8 +1,8 @@
 #!/usr/bin/env node
 
 import "dotenv/config";
-import { randomUUID } from "node:crypto";
-import express, { Request, Response } from "express";
+import { randomUUID, createHash, timingSafeEqual } from "node:crypto";
+import express, { Request, Response, NextFunction } from "express";
 import { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { StreamableHTTPServerTransport } from "@modelcontextprotocol/sdk/server/streamableHttp.js";
 import { StdioServerTransport } from "@modelcontextprotocol/sdk/server/stdio.js";
@@ -28,6 +28,19 @@ const PTERO_URL = process.env.PTERODACTYL_URL;
 const PTERO_APP_KEY = process.env.PTERODACTYL_APP_KEY;
 const PTERO_CLIENT_KEY = process.env.PTERODACTYL_CLIENT_KEY;
 const MCP_JSON_LIMIT = process.env.MCP_JSON_LIMIT ?? "50mb";
+const MCP_AUTH_TOKEN = process.env.MCP_AUTH_TOKEN;
+
+// Optional bearer auth; unset token leaves /mcp unprotected.
+function isAuthorized(req: Request): boolean {
+  if (!MCP_AUTH_TOKEN) return true;
+  const header = req.headers.authorization;
+  if (!header) return false;
+  const match = /^Bearer\s+(.+)$/i.exec(header);
+  if (!match) return false;
+  const given = createHash("sha256").update(match[1]).digest();
+  const expected = createHash("sha256").update(MCP_AUTH_TOKEN).digest();
+  return timingSafeEqual(expected, given);
+}
 
 if (!PTERO_URL) {
   console.error("Missing PTERODACTYL_URL environment variable.");
@@ -89,8 +102,14 @@ function startHttp() {
 
   const transports = new Map<string, StreamableHTTPServerTransport>();
 
+  const requireAuth = (req: Request, res: Response, next: NextFunction) => {
+    if (isAuthorized(req)) return next();
+    res.setHeader("WWW-Authenticate", 'Bearer realm="mcp"');
+    res.status(401).json({ error: "unauthorized" });
+  };
+
   // POST /mcp  — client-to-server messages (including initialize)
-  app.post("/mcp", async (req: Request, res: Response) => {
+  app.post("/mcp", requireAuth, async (req: Request, res: Response) => {
     const sessionId = req.headers["mcp-session-id"] as string | undefined;
 
     // Existing session
@@ -129,7 +148,7 @@ function startHttp() {
   });
 
   // GET /mcp  — SSE stream for server-to-client notifications
-  app.get("/mcp", async (req: Request, res: Response) => {
+  app.get("/mcp", requireAuth, async (req: Request, res: Response) => {
     const sessionId = req.headers["mcp-session-id"] as string | undefined;
     if (!sessionId || !transports.has(sessionId)) {
       res.status(400).json({
@@ -144,7 +163,7 @@ function startHttp() {
   });
 
   // DELETE /mcp  — session termination
-  app.delete("/mcp", async (req: Request, res: Response) => {
+  app.delete("/mcp", requireAuth, async (req: Request, res: Response) => {
     const sessionId = req.headers["mcp-session-id"] as string | undefined;
     if (!sessionId || !transports.has(sessionId)) {
       res.status(400).json({
@@ -168,6 +187,11 @@ function startHttp() {
   app.listen(port, () => {
     console.log(
       `Pterodactyl MCP server listening on http://localhost:${port}/mcp`,
+    );
+    console.error(
+      MCP_AUTH_TOKEN
+        ? "MCP auth: bearer required on /mcp"
+        : "MCP auth: disabled (MCP_AUTH_TOKEN not set)",
     );
   });
 }
