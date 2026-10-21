@@ -74,7 +74,13 @@ npm start
 
 ## Docker
 
-The image is built locally; no registry tag is published.
+Prebuilt images are published to GitHub Container Registry on every push to `master`:
+
+```bash
+docker pull ghcr.io/navok85/pterodactyl-mcp:latest
+```
+
+Tags are `latest` and `sha-<full commit sha>`. The package is built from this repository by `.github/workflows/docker.yml`; if the pull fails with `unauthorized`, the package is still private — make it public under the repository's Packages, or `docker login ghcr.io` with a token that has `read:packages`.
 
 **Docker Compose:**
 
